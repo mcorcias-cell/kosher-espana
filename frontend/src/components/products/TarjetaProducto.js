@@ -1,0 +1,73 @@
+// src/components/products/TarjetaProducto.js
+import React from 'react';
+
+const TIPO_LABELS = {
+  ingredientes_verificables: { texto: 'Ingredientes verificables', color: '#d69e2e', bg: '#fefcbf' },
+  certificacion_externa: { texto: 'Cert. organización externa', color: '#2b6cb0', bg: '#ebf8ff' },
+  certificacion_completa: { texto: 'Certificación completa', color: '#276749', bg: '#f0fff4' },
+};
+
+const TarjetaProducto = ({ producto, onClick }) => {
+  const ultimaValidacion = producto.validaciones?.[0];
+  const tipoInfo = ultimaValidacion ? TIPO_LABELS[ultimaValidacion.tipo] : null;
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: 'white',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        cursor: 'pointer',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        border: '1px solid #e2e8f0',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; }}
+    >
+      {/* Imagen */}
+      <div style={{ height: '160px', background: '#f7fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        {producto.imagen_url ? (
+          <img src={producto.imagen_url} alt={producto.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <span style={{ fontSize: '3rem', color: '#cbd5e0' }}>📦</span>
+        )}
+      </div>
+
+      {/* Contenido */}
+      <div style={{ padding: '1rem' }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 600, color: '#1a365d' }}>{producto.nombre}</h3>
+        <p style={{ margin: '0 0 8px', color: '#718096', fontSize: '0.85rem' }}>{producto.marca}</p>
+
+        {producto.sabor_variante && (
+          <p style={{ margin: '0 0 8px', color: '#a0aec0', fontSize: '0.8rem' }}>{producto.sabor_variante}</p>
+        )}
+
+        {tipoInfo && (
+          <div style={{ marginTop: '8px' }}>
+            <span style={{
+              display: 'inline-block',
+              padding: '3px 10px',
+              borderRadius: '20px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: tipoInfo.color,
+              background: tipoInfo.bg,
+            }}>
+              ✓ {tipoInfo.texto}
+            </span>
+          </div>
+        )}
+
+        {ultimaValidacion && (
+          <p style={{ margin: '8px 0 0', fontSize: '0.75rem', color: '#a0aec0' }}>
+            Validado por {ultimaValidacion.validador} · {ultimaValidacion.comunidad}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default TarjetaProducto;
