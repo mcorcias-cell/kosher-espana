@@ -1,5 +1,5 @@
 // src/pages/BusquedaPage.js
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { productosService } from '../services/api';
 import TarjetaProducto from '../components/products/TarjetaProducto';
@@ -29,6 +29,9 @@ const BusquedaPage = () => {
   const [cargando, setCargando] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
+
+  // Cargar todos los productos al entrar
+  useEffect(() => { buscar(1); }, []);
 
   const buscar = useCallback(async (pag = 1) => {
     setCargando(true);
