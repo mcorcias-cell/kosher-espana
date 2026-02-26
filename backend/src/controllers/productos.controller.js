@@ -5,7 +5,7 @@ const { cloudinary } = require('../config/cloudinary');
 
 // Buscar productos (solo validados y visibles)
 const buscarProductos = async (req, res) => {
-  const { nombre, marca, fabricante, codigo_barras, sabor_variante, page = 1, limit = 20 } = req.query;
+  const { nombre, marca, fabricante, codigo_barras, sabor_variante, categoria_id, page = 1, limit = 20 } = req.query;
   const offset = (page - 1) * limit;
   const params = [];
   const condiciones = ["p.estado = 'validado'", "p.visible = true"];
@@ -15,6 +15,7 @@ const buscarProductos = async (req, res) => {
   if (fabricante) { params.push(`%${fabricante}%`); condiciones.push(`p.fabricante ILIKE $${params.length}`); }
   if (codigo_barras) { params.push(codigo_barras); condiciones.push(`p.codigo_barras = $${params.length}`); }
   if (sabor_variante) { params.push(`%${sabor_variante}%`); condiciones.push(`p.sabor_variante ILIKE $${params.length}`); }
+  if (categoria_id) { params.push(categoria_id); condiciones.push(`EXISTS (SELECT 1 FROM producto_categorias pc WHERE pc.producto_id = p.id AND pc.categoria_id = $${params.length})`); }
 
   const where = condiciones.join(' AND ');
 
@@ -23,18 +24,19 @@ const buscarProductos = async (req, res) => {
     const query = `
       SELECT p.*,
         u.nombre AS subido_por_nombre,
+        json_agg(DISTINCT jsonb_build_object('id', c.id, 'nombre', c.nombre, 'icono', c.icono)) FILTER (WHERE c.id IS NOT NULL) AS categorias,
         json_agg(
           json_build_object(
-            'id', v.id,
-            'tipo', v.tipo_validacion,
+            'id', v.id, 'tipo', v.tipo_validacion,
             'validador', uv.nombre || ' ' || uv.apellido,
-            'comunidad', uv.comunidad,
-            'fecha', v.created_at,
+            'comunidad', uv.comunidad, 'fecha', v.created_at,
             'es_revalidacion', v.es_revalidacion
           )
         ) FILTER (WHERE v.id IS NOT NULL) AS validaciones
       FROM productos p
       LEFT JOIN users u ON p.subido_por = u.id
+      LEFT JOIN producto_categorias pc ON pc.producto_id = p.id
+      LEFT JOIN categorias c ON c.id = pc.categoria_id
       LEFT JOIN validaciones v ON v.producto_id = p.id
       LEFT JOIN users uv ON v.validador_id = uv.id
       WHERE ${where}
@@ -43,7 +45,7 @@ const buscarProductos = async (req, res) => {
       LIMIT $${params.length - 1} OFFSET $${params.length}
     `;
 
-    const countQuery = `SELECT COUNT(*) FROM productos p WHERE ${where}`;
+    const countQuery = `SELECT COUNT(DISTINCT p.id) FROM productos p LEFT JOIN producto_categorias pc ON pc.producto_id = p.id WHERE ${where}`;
     const [result, countResult] = await Promise.all([
       pool.query(query, params),
       pool.query(countQuery, params.slice(0, -2)),

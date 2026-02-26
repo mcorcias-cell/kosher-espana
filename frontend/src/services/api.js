@@ -56,4 +56,13 @@ export const usuariosService = {
   suscripcion: (tipo) => api.put('/reportes/suscripcion', { tipo }),
 };
 
+export const categoriasService = {
+  listar: () => api.get('/categorias'),
+  listarAdmin: () => api.get('/categorias/admin'),
+  crear: (datos) => api.post('/categorias', datos),
+  actualizar: (id, datos) => api.put(`/categorias/${id}`, datos),
+  eliminar: (id) => api.delete(`/categorias/${id}`),
+  asignarAProducto: (productoId, categoria_ids) => api.put(`/categorias/producto/${productoId}`, { categoria_ids }),
+};
+
 export default api;

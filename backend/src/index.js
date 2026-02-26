@@ -11,6 +11,7 @@ const validacionesRoutes = require('./routes/validaciones.routes');
 const usuariosRoutes = require('./routes/usuarios.routes');
 const feedbackRoutes = require('./routes/feedback.routes');
 const reportesRoutes = require('./routes/reportes.routes');
+const categoriasRoutes = require('./routes/categorias.routes');
 const { iniciarCronJobs } = require('./services/cron.service');
 
 const app = express();
@@ -50,6 +51,7 @@ app.use('/api/validaciones', validacionesRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/reportes', reportesRoutes);
+app.use('/api/categorias', categoriasRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -60,6 +60,16 @@ const TarjetaProducto = ({ producto, onClick }) => {
           </div>
         )}
 
+        {producto.categorias && producto.categorias.length > 0 && (
+          <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+            {producto.categorias.slice(0, 2).map((c, i) => (
+              <span key={i} style={{ fontSize: '0.72rem', background: '#f0fff4', color: '#276749', padding: '2px 8px', borderRadius: '10px' }}>
+                {c.icono} {c.nombre}
+              </span>
+            ))}
+          </div>
+        )}
+
         {ultimaValidacion && (
           <p style={{ margin: '8px 0 0', fontSize: '0.75rem', color: '#a0aec0' }}>
             Validado por {ultimaValidacion.validador} · {ultimaValidacion.comunidad}
