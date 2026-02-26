@@ -1,6 +1,7 @@
 # railway.toml - Configuración de despliegue en Railway
 [build]
 builder = "nixpacks"
+buildCommand = "npm install --legacy-peer-deps"
 
 [deploy]
 startCommand = "node src/index.js"
