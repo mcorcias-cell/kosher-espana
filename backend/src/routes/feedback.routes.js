@@ -1,7 +1,7 @@
 // src/routes/feedback.routes.js
 const express = require('express');
 const router = express.Router();
-const { verificarToken, verificarRol } = require('../middleware/auth');
+const { verificarToken, requiereRol } = require('../middleware/auth.middleware');
 const { upload } = require('../config/cloudinary');
 const {
   listarFeedback, crearFeedback, borrarFeedback,
@@ -9,8 +9,8 @@ const {
   aprobarFoto, rechazarFoto, listarFotosPendientes, listarSolicitudesRetirada,
 } = require('../controllers/feedback.controller');
 
-const esValidadorOAdmin = verificarRol(['validador', 'administrador', 'intermedio']);
-const esAdmin = verificarRol(['administrador']);
+const esValidadorOAdmin = requiereRol('validador', 'administrador', 'intermedio');
+const esAdmin = requiereRol('administrador');
 
 // Públicas
 router.get('/producto/:productoId', listarFeedback);
