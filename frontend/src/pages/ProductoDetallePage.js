@@ -11,6 +11,13 @@ const TIPO_LABELS = {
   certificacion_completa: { texto: 'Certificación completa de la comunidad', emoji: '⭐', color: '#276749' },
 };
 
+const KOSHER_LABELS = {
+  pareve:  { texto: 'Páreve',  color: '#2b6cb0', bg: '#ebf8ff', emoji: '🔵' },
+  lacteo:  { texto: 'Lácteo',  color: '#b7791f', bg: '#fefcbf', emoji: '🟡' },
+  carnico: { texto: 'Cárnico', color: '#c53030', bg: '#fff5f5', emoji: '🔴' },
+  pescado: { texto: 'Pescado', color: '#2c7a7b', bg: '#e6fffa', emoji: '🐟' },
+};
+
 const S = {
   page: { maxWidth: '900px', margin: '0 auto', padding: '2rem 1rem' },
   card: { background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' },
@@ -85,6 +92,23 @@ const ProductoDetallePage = () => {
           <div style={S.info}>
             <h1 style={S.titulo}>{producto.nombre}</h1>
             <p style={S.marca}>{producto.marca}</p>
+
+            {/* Tipo kosher + Categorías */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '1rem' }}>
+              {producto.tipo_kosher && KOSHER_LABELS[producto.tipo_kosher] && (() => {
+                const k = KOSHER_LABELS[producto.tipo_kosher];
+                return (
+                  <span style={{ padding: '5px 14px', borderRadius: '20px', fontWeight: 700, fontSize: '0.9rem', color: k.color, background: k.bg, border: `1px solid ${k.color}` }}>
+                    {k.emoji} {k.texto}
+                  </span>
+                );
+              })()}
+              {producto.categorias && producto.categorias.map((c, i) => (
+                <span key={i} style={{ padding: '5px 14px', borderRadius: '20px', fontSize: '0.85rem', background: '#f0fff4', color: '#276749', border: '1px solid #c6f6d5' }}>
+                  {c.icono} {c.nombre}
+                </span>
+              ))}
+            </div>
 
             {/* Sellos de validación */}
             {producto.validaciones && producto.validaciones.length > 0 && (
