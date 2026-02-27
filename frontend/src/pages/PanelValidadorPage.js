@@ -1,8 +1,10 @@
 // src/pages/PanelValidadorPage.js
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { productosService, validacionesService, feedbackService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 const TIPOS = [
   { value: 'ingredientes_verificables', label: '🔍 Ingredientes verificables' },
@@ -34,6 +36,8 @@ const S = {
 
 const PanelValidadorPage = () => {
   const { usuario } = useAuth();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [tabActiva, setTabActiva] = useState('pendientes');
   const [pendientes, setPendientes] = useState([]);
   const [revalidar, setRevalidar] = useState([]);
@@ -41,6 +45,8 @@ const PanelValidadorPage = () => {
   const [validandoId, setValidandoId] = useState(null);
   const [decisiones, setDecisiones] = useState({});
   const [infoIntermedias, setInfoIntermedias] = useState({});
+  const [fotosPendientes, setFotosPendientes] = useState([]);
+  const [cargandoFotos, setCargandoFotos] = useState(false);
 
   const esValidador = ['validador', 'administrador'].includes(usuario?.rol);
   const esIntermedio = usuario?.rol === 'intermedio';
@@ -111,6 +117,38 @@ const PanelValidadorPage = () => {
     }
   };
 
+  const cargarFotos = async () => {
+    setCargandoFotos(true);
+    try {
+      const res = await feedbackService.fotosPendientes();
+      setFotosPendientes(res.data);
+    } catch {
+      toast.error('Error cargando fotos');
+    } finally {
+      setCargandoFotos(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tabActiva === 'fotos') cargarFotos();
+  }, [tabActiva]);
+
+  const handleAprobarFoto = async (id) => {
+    try {
+      await feedbackService.aprobarFoto(id);
+      toast.success('✅ Foto aprobada');
+      setFotosPendientes(f => f.filter(x => x.id !== id));
+    } catch { toast.error('Error'); }
+  };
+
+  const handleRechazarFoto = async (id) => {
+    try {
+      await feedbackService.rechazarFoto(id);
+      toast.success('Foto rechazada');
+      setFotosPendientes(f => f.filter(x => x.id !== id));
+    } catch { toast.error('Error'); }
+  };
+
   const lista = tabActiva === 'pendientes' ? pendientes : revalidar;
 
   return (
@@ -126,6 +164,11 @@ const PanelValidadorPage = () => {
         {esValidador && (
           <button style={S.tab(tabActiva === 'revalidar')} onClick={() => setTabActiva('revalidar')}>
             Para revalidar ({revalidar.length})
+          </button>
+        )}
+        {esValidador && (
+          <button style={S.tab(tabActiva === 'fotos')} onClick={() => setTabActiva('fotos')}>
+            📷 Fotos pendientes{fotosPendientes.length > 0 ? ` (${fotosPendientes.length})` : ''}
           </button>
         )}
       </div>
@@ -221,6 +264,48 @@ const PanelValidadorPage = () => {
           )}
         </div>
       ))}
+
+      {/* TAB: Fotos pendientes */}
+      {tabActiva === 'fotos' && (
+        <div>
+          {cargandoFotos ? (
+            <div style={S.vacio}>Cargando fotos...</div>
+          ) : fotosPendientes.length === 0 ? (
+            <div style={S.vacio}>
+              <div style={{ fontSize: '3rem' }}>✅</div>
+              <p>No hay fotos pendientes de revisión</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+              {fotosPendientes.map(f => (
+                <div key={f.id} style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                  <img src={f.foto_url} alt="Foto pendiente" style={{ width: '100%', height: '190px', objectFit: 'cover' }} />
+                  <div style={{ padding: '1rem' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '4px' }}>
+                      {f.producto_nombre} <span style={{ color: '#718096', fontWeight: 400 }}>· {f.producto_marca}</span>
+                    </div>
+                    <div style={{ fontSize: '0.83rem', color: '#4a5568', marginBottom: '4px' }}>🏪 {f.supermercado} · 📍 {f.localidad}</div>
+                    <div style={{ fontSize: '0.76rem', color: '#a0aec0', marginBottom: '1rem' }}>
+                      Subida por {f.usuario_nombre} · {new Date(f.created_at).toLocaleDateString('es-ES')}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleAprobarFoto(f.id)} style={{ flex: 1, padding: '8px', background: '#276749', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>
+                        ✅ Aprobar
+                      </button>
+                      <button onClick={() => handleRechazarFoto(f.id)} style={{ flex: 1, padding: '8px', background: '#c53030', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>
+                        ❌ Rechazar
+                      </button>
+                      <button onClick={() => navigate(`/producto/${f.producto_id}`)} style={{ padding: '8px 10px', background: '#ebf8ff', color: '#2b6cb0', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem' }}>
+                        👁️
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
