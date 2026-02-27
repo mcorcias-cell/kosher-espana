@@ -1,6 +1,6 @@
 // src/controllers/feedback.controller.js
 const { pool } = require('../config/database');
-const cloudinary = require('../config/cloudinary');
+const { cloudinary } = require('../config/cloudinary');
 
 // ─── Listar aportaciones de un producto ───────────────────────────────────────
 const listarFeedback = async (req, res) => {

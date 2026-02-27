@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { verificarToken, verificarRol } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { upload } = require('../config/cloudinary');
 const {
   listarFeedback, crearFeedback, borrarFeedback,
   responderFeedback, solicitarRetirada, desestrimarRetirada,
