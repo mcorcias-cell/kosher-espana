@@ -1,5 +1,5 @@
 // src/controllers/feedback.controller.js
-const { pool } = require('../config/database');
+const pool = require('../config/database');
 const { cloudinary } = require('../config/cloudinary');
 
 // ─── Listar aportaciones de un producto ───────────────────────────────────────
