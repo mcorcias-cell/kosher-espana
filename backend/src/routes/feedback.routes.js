@@ -1,11 +1,33 @@
 // src/routes/feedback.routes.js
 const express = require('express');
 const router = express.Router();
-const { agregarFeedback, agregarInfoIntermedia, verificarFeedback } = require('../controllers/feedback.controller');
-const { verificarToken, requiereRol } = require('../middleware/auth.middleware');
+const { verificarToken, verificarRol } = require('../middleware/auth');
+const upload = require('../middleware/upload');
+const {
+  listarFeedback, crearFeedback, borrarFeedback,
+  responderFeedback, solicitarRetirada, desestrimarRetirada,
+  aprobarFoto, rechazarFoto, listarFotosPendientes, listarSolicitudesRetirada,
+} = require('../controllers/feedback.controller');
 
-router.post('/producto/:producto_id', verificarToken, agregarFeedback);
-router.post('/producto/:producto_id/info-intermedia', verificarToken, requiereRol('intermedio', 'administrador'), agregarInfoIntermedia);
-router.put('/:id/verificar', verificarToken, requiereRol('administrador'), verificarFeedback);
+const esValidadorOAdmin = verificarRol(['validador', 'administrador', 'intermedio']);
+const esAdmin = verificarRol(['administrador']);
+
+// Públicas
+router.get('/producto/:productoId', listarFeedback);
+
+// Usuario autenticado
+router.post('/producto/:productoId', verificarToken, upload.single('foto'), crearFeedback);
+router.delete('/:feedbackId', verificarToken, borrarFeedback);
+
+// Validador y admin
+router.post('/:feedbackId/responder', verificarToken, esValidadorOAdmin, responderFeedback);
+router.patch('/:feedbackId/solicitar-retirada', verificarToken, esValidadorOAdmin, solicitarRetirada);
+router.get('/admin/fotos-pendientes', verificarToken, esValidadorOAdmin, listarFotosPendientes);
+router.patch('/:feedbackId/aprobar-foto', verificarToken, esValidadorOAdmin, aprobarFoto);
+router.patch('/:feedbackId/rechazar-foto', verificarToken, esValidadorOAdmin, rechazarFoto);
+
+// Solo admin
+router.get('/admin/solicitudes-retirada', verificarToken, esAdmin, listarSolicitudesRetirada);
+router.patch('/:feedbackId/desestimar-retirada', verificarToken, esAdmin, desestrimarRetirada);
 
 module.exports = router;

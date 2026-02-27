@@ -9,7 +9,8 @@
     "migrate": "node src/config/migrate.js",
     "migrate-categorias": "node src/config/migrate-categorias.js",
     "migrate-tipo-kosher": "node src/config/migrate-tipo-kosher.js",
-    "seed": "node src/config/seed.js"
+    "seed": "node src/config/seed.js",
+    "migrate-feedback": "node src/config/migrate-feedback.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
