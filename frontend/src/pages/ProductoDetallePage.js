@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { productosService, feedbackService } from '../services/api';
+import { productosService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import AportacionesSection from '../components/feedback/AportacionesSection';
 
 const TIPO_LABELS = {
   ingredientes_verificables: { texto: 'Ingredientes verificables', emoji: '🔍', color: '#d69e2e' },
@@ -26,8 +27,7 @@ const ProductoDetallePage = () => {
   const isMobile = useIsMobile();
   const [producto, setProducto] = useState(null);
   const [cargando, setCargando] = useState(true);
-  const [feedbackForm, setFeedbackForm] = useState({ supermercado: '', localidad: '', notas: '' });
-  const [enviandoFeedback, setEnviandoFeedback] = useState(false);
+
 
   useEffect(() => {
     productosService.obtener(id)
@@ -36,24 +36,6 @@ const ProductoDetallePage = () => {
       .finally(() => setCargando(false));
   }, [id, navigate]);
 
-  const enviarFeedback = async (e) => {
-    e.preventDefault();
-    if (!feedbackForm.supermercado || !feedbackForm.localidad) {
-      return toast.error('Supermercado y localidad son obligatorios');
-    }
-    setEnviandoFeedback(true);
-    try {
-      await feedbackService.agregar(id, feedbackForm);
-      toast.success('¡Gracias por tu aportación!');
-      setFeedbackForm({ supermercado: '', localidad: '', notas: '' });
-      const res = await productosService.obtener(id);
-      setProducto(res.data);
-    } catch {
-      toast.error('Error al enviar la información');
-    } finally {
-      setEnviandoFeedback(false);
-    }
-  };
 
   if (cargando) return <div style={{ textAlign: 'center', padding: '4rem', color: '#718096' }}>Cargando producto...</div>;
   if (!producto) return null;
@@ -173,20 +155,7 @@ const ProductoDetallePage = () => {
           </div>
         )}
 
-        {/* Formulario feedback */}
-        {usuario && (
-          <div style={seccion}>
-            <h2 style={subtitulo}>📍 ¿Lo encontraste en algún supermercado?</h2>
-            <form onSubmit={enviarFeedback} style={{ maxWidth: '480px' }}>
-              <input style={inputStyle} placeholder="Nombre del supermercado *" value={feedbackForm.supermercado} onChange={e => setFeedbackForm(f => ({ ...f, supermercado: e.target.value }))} />
-              <input style={inputStyle} placeholder="Localidad / ciudad *" value={feedbackForm.localidad} onChange={e => setFeedbackForm(f => ({ ...f, localidad: e.target.value }))} />
-              <input style={inputStyle} placeholder="Notas adicionales (opcional)" value={feedbackForm.notas} onChange={e => setFeedbackForm(f => ({ ...f, notas: e.target.value }))} />
-              <button type="submit" style={{ padding: '10px 20px', background: '#2b6cb0', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }} disabled={enviandoFeedback}>
-                {enviandoFeedback ? 'Enviando...' : 'Reportar ubicación'}
-              </button>
-            </form>
-          </div>
-        )}
+        <AportacionesSection productoId={id} />
       </div>
     </div>
   );

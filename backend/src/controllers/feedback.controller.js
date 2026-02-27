@@ -17,13 +17,15 @@ const listarFeedback = async (req, res) => {
             json_build_object(
               'id', r.id,
               'respuesta', r.respuesta,
-              'created_at', r.created_at
+              'created_at', r.created_at,
+              'respondido_por_nombre', ru.nombre
             ) ORDER BY r.created_at ASC
           ) FILTER (WHERE r.id IS NOT NULL), '[]'
         ) AS respuestas
       FROM feedback_productos f
       JOIN users u ON f.usuario_id = u.id
       LEFT JOIN respuestas_feedback r ON r.feedback_id = f.id
+      LEFT JOIN users ru ON r.respondido_por = ru.id
       WHERE f.producto_id = $1
       GROUP BY f.id, u.nombre, u.id
       ORDER BY f.created_at DESC

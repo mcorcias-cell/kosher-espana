@@ -43,9 +43,16 @@ export const validacionesService = {
 };
 
 export const feedbackService = {
-  agregar: (productoId, datos) => api.post(`/feedback/producto/${productoId}`, datos),
-  agregarInfo: (productoId, datos) => api.post(`/feedback/producto/${productoId}/info-intermedia`, datos),
-  verificar: (id) => api.put(`/feedback/${id}/verificar`),
+  listar: (productoId) => api.get(`/feedback/producto/${productoId}`),
+  agregar: (productoId, datos) => api.post(`/feedback/producto/${productoId}`, datos, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  borrar: (id) => api.delete(`/feedback/${id}`),
+  responder: (id, respuesta) => api.post(`/feedback/${id}/responder`, { respuesta }),
+  solicitarRetirada: (id) => api.patch(`/feedback/${id}/solicitar-retirada`),
+  desestrimarRetirada: (id) => api.patch(`/feedback/${id}/desestimar-retirada`),
+  aprobarFoto: (id) => api.patch(`/feedback/${id}/aprobar-foto`),
+  rechazarFoto: (id) => api.patch(`/feedback/${id}/rechazar-foto`),
+  fotosPendientes: () => api.get('/feedback/admin/fotos-pendientes'),
+  solicitudesRetirada: () => api.get('/feedback/admin/solicitudes-retirada'),
 };
 
 export const usuariosService = {
