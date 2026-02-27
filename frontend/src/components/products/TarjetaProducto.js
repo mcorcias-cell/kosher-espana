@@ -7,31 +7,37 @@ const TIPO_LABELS = {
   certificacion_completa: { texto: 'Certificación completa', color: '#276749', bg: '#f0fff4' },
 };
 
+const KOSHER_LABELS = {
+  pareve:  { texto: 'Páreve',  color: '#2b6cb0', bg: '#ebf8ff', emoji: '🔵' },
+  lacteo:  { texto: 'Lácteo',  color: '#b7791f', bg: '#fefcbf', emoji: '🟡' },
+  carnico: { texto: 'Cárnico', color: '#c53030', bg: '#fff5f5', emoji: '🔴' },
+  pescado: { texto: 'Pescado', color: '#2c7a7b', bg: '#e6fffa', emoji: '🐟' },
+};
+
 const TarjetaProducto = ({ producto, onClick }) => {
   const ultimaValidacion = producto.validaciones?.[0];
   const tipoInfo = ultimaValidacion ? TIPO_LABELS[ultimaValidacion.tipo] : null;
+  const kosherInfo = producto.tipo_kosher ? KOSHER_LABELS[producto.tipo_kosher] : null;
 
   return (
     <div
       onClick={onClick}
-      style={{
-        background: 'white',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        cursor: 'pointer',
-        transition: 'transform 0.15s, box-shadow 0.15s',
-        border: '1px solid #e2e8f0',
-      }}
+      style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s', border: '1px solid #e2e8f0' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; }}
     >
       {/* Imagen */}
-      <div style={{ height: '160px', background: '#f7fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', height: '160px', background: '#f7fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         {producto.imagen_url ? (
           <img src={producto.imagen_url} alt={producto.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <span style={{ fontSize: '3rem', color: '#cbd5e0' }}>📦</span>
+        )}
+        {/* Badge tipo kosher sobre la imagen */}
+        {kosherInfo && (
+          <span style={{ position: 'absolute', top: '8px', right: '8px', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700, color: kosherInfo.color, background: kosherInfo.bg, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}>
+            {kosherInfo.emoji} {kosherInfo.texto}
+          </span>
         )}
       </div>
 
@@ -45,19 +51,9 @@ const TarjetaProducto = ({ producto, onClick }) => {
         )}
 
         {tipoInfo && (
-          <div style={{ marginTop: '8px' }}>
-            <span style={{
-              display: 'inline-block',
-              padding: '3px 10px',
-              borderRadius: '20px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              color: tipoInfo.color,
-              background: tipoInfo.bg,
-            }}>
-              ✓ {tipoInfo.texto}
-            </span>
-          </div>
+          <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, color: tipoInfo.color, background: tipoInfo.bg }}>
+            ✓ {tipoInfo.texto}
+          </span>
         )}
 
         {producto.categorias && producto.categorias.length > 0 && (

@@ -30,7 +30,7 @@ const SubirProductoPage = () => {
   const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState([]);
   const [form, setForm] = useState({
     nombre: '', marca: '', gramaje: '', sabor_variante: '',
-    fabricante: '', codigo_barras: '', justificacion: '', imagen: null,
+    fabricante: '', codigo_barras: '', justificacion: '', imagen: null, tipo_kosher: '',
   });
 
   useEffect(() => {
@@ -127,6 +127,20 @@ const SubirProductoPage = () => {
           <div style={S.grupo}>
             <label style={S.label}>Código de barras</label>
             <input style={S.input} name="codigo_barras" value={form.codigo_barras} onChange={handleChange} placeholder="Escanea o escribe el código" />
+          </div>
+
+          {/* Tipo Kosher */}
+          <div style={S.grupo}>
+            <label style={S.label}>Tipo Kosher <span style={{fontWeight:400, color:'#718096'}}>(opcional)</span></label>
+            <div style={{display:'flex', gap:'8px', flexWrap:'wrap', marginTop:'6px'}}>
+              {[{v:'pareve',l:'🔵 Páreve'},{v:'lacteo',l:'🟡 Lácteo'},{v:'carnico',l:'🔴 Cárnico'},{v:'pescado',l:'🐟 Pescado'}].map(t => (
+                <button key={t.v} type="button"
+                  style={{padding:'8px 16px', borderRadius:'20px', border: form.tipo_kosher === t.v ? '2px solid #2b6cb0' : '2px solid #e2e8f0', background: form.tipo_kosher === t.v ? '#ebf8ff' : 'white', color: form.tipo_kosher === t.v ? '#2b6cb0' : '#4a5568', cursor:'pointer', fontWeight: form.tipo_kosher === t.v ? 700 : 400, fontSize:'0.875rem'}}
+                  onClick={() => setForm(f => ({...f, tipo_kosher: f.tipo_kosher === t.v ? '' : t.v}))}>
+                  {t.l}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Selector de categorías */}

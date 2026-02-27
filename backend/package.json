@@ -5,9 +5,11 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "install": "npm install --legacy-peer-deps",
     "dev": "nodemon src/index.js",
     "migrate": "node src/config/migrate.js",
     "migrate-categorias": "node src/config/migrate-categorias.js",
+    "migrate-tipo-kosher": "node src/config/migrate-tipo-kosher.js",
     "seed": "node src/config/seed.js"
   },
   "dependencies": {

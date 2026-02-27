@@ -16,6 +16,7 @@ const buscarProductos = async (req, res) => {
   if (codigo_barras) { params.push(codigo_barras); condiciones.push(`p.codigo_barras = $${params.length}`); }
   if (sabor_variante) { params.push(`%${sabor_variante}%`); condiciones.push(`p.sabor_variante ILIKE $${params.length}`); }
   if (categoria_id) { params.push(categoria_id); condiciones.push(`EXISTS (SELECT 1 FROM producto_categorias pc WHERE pc.producto_id = p.id AND pc.categoria_id = $${params.length})`); }
+  if (req.query.tipo_kosher) { params.push(req.query.tipo_kosher); condiciones.push(`p.tipo_kosher = $${params.length}`); }
 
   const where = condiciones.join(' AND ');
 
@@ -133,17 +134,17 @@ const crearProducto = async (req, res) => {
     return res.status(400).json({ errores: errors.array() });
   }
 
-  const { nombre, marca, gramaje, sabor_variante, fabricante, codigo_barras, justificacion } = req.body;
+  const { nombre, marca, gramaje, sabor_variante, fabricante, codigo_barras, justificacion, tipo_kosher } = req.body;
 
   try {
     const imagen_url = req.file?.path || null;
     const imagen_public_id = req.file?.filename || null;
 
     const result = await pool.query(
-      `INSERT INTO productos (nombre, marca, gramaje, sabor_variante, fabricante, codigo_barras, justificacion, imagen_url, imagen_public_id, subido_por, estado, visible)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pendiente', false)
+      `INSERT INTO productos (nombre, marca, gramaje, sabor_variante, fabricante, codigo_barras, justificacion, tipo_kosher, imagen_url, imagen_public_id, subido_por, estado, visible)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pendiente', false)
        RETURNING *`,
-      [nombre, marca, gramaje, sabor_variante, fabricante, codigo_barras, justificacion, imagen_url, imagen_public_id, req.usuario.id]
+      [nombre, marca, gramaje, sabor_variante, fabricante, codigo_barras, justificacion, tipo_kosher || null, imagen_url, imagen_public_id, req.usuario.id]
     );
 
     res.status(201).json({
