@@ -91,7 +91,12 @@ const obtenerProducto = async (req, res) => {
             'id', ii.id, 'informacion', ii.informacion,
             'usuario', ui.nombre, 'fecha', ii.created_at
           )
-        ) FILTER (WHERE ii.id IS NOT NULL) AS info_intermedia
+        ) FILTER (WHERE ii.id IS NOT NULL) AS info_intermedia,
+        json_agg(
+          DISTINCT jsonb_build_object(
+            'id', c.id, 'nombre', c.nombre, 'icono', c.icono
+          )
+        ) FILTER (WHERE c.id IS NOT NULL) AS categorias
       FROM productos p
       LEFT JOIN users u ON p.subido_por = u.id
       LEFT JOIN validaciones v ON v.producto_id = p.id
@@ -99,6 +104,8 @@ const obtenerProducto = async (req, res) => {
       LEFT JOIN feedback_productos f ON f.producto_id = p.id
       LEFT JOIN info_intermedia ii ON ii.producto_id = p.id
       LEFT JOIN users ui ON ii.usuario_id = ui.id
+      LEFT JOIN producto_categorias pc ON pc.producto_id = p.id
+      LEFT JOIN categorias c ON c.id = pc.categoria_id
       WHERE p.id = $1
       GROUP BY p.id, u.nombre`,
       [id]
