@@ -20,6 +20,15 @@ const KOSHER_LABELS = {
   pescado: { texto: 'Pescado', color: '#2c7a7b', bg: '#e6fffa', emoji: '🐟' },
 };
 
+const BERAJA_LABELS = {
+  hamotzi:      { texto: 'המוציא Hamotzi',      emoji: '🍞', color: '#744210', bg: '#fefcbf' },
+  mezonot:      { texto: 'מזונות Mezonot',      emoji: '🫓', color: '#744210', bg: '#fffaf0' },
+  peri_haguefen:{ texto: 'פרי הגפן Peri Haguefen', emoji: '🍇', color: '#553c9a', bg: '#faf5ff' },
+  haetz:        { texto: 'העץ Haetz',            emoji: '🌳', color: '#276749', bg: '#f0fff4' },
+  haadama:      { texto: 'האדמה Haadama',        emoji: '🌱', color: '#276749', bg: '#e6fffa' },
+  sheakol:      { texto: 'שהכל Sheakol',         emoji: '🌟', color: '#2b6cb0', bg: '#ebf8ff' },
+};
+
 const ProductoDetallePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -27,6 +36,11 @@ const ProductoDetallePage = () => {
   const isMobile = useIsMobile();
   const [producto, setProducto] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [modalBorrar, setModalBorrar] = useState(false);
+  const [motivoBorrar, setMotivoBorrar] = useState('');
+  const [notificarEmail, setNotificarEmail] = useState(true);
+  const [borrando, setBorrando] = useState(false);
+  const [editandoBeraja, setEditandoBeraja] = useState(false);
 
 
   useEffect(() => {
@@ -36,6 +50,34 @@ const ProductoDetallePage = () => {
       .finally(() => setCargando(false));
   }, [id, navigate]);
 
+
+  const handleBorrarProducto = async () => {
+    if (!motivoBorrar || motivoBorrar.trim().length < 5) {
+      return toast.error('El motivo es obligatorio (mínimo 5 caracteres)');
+    }
+    setBorrando(true);
+    try {
+      await productosService.borrar(id, { motivo: motivoBorrar, notificar_email: notificarEmail });
+      toast.success('Producto eliminado');
+      navigate('/');
+    } catch {
+      toast.error('Error al eliminar el producto');
+    } finally {
+      setBorrando(false);
+    }
+  };
+
+  const handleGuardarBeraja = async (beraja) => {
+    try {
+      await productosService.actualizarBeraja(id, beraja);
+      toast.success('Beraja actualizada');
+      setEditandoBeraja(false);
+      const res = await productosService.obtener(id);
+      setProducto(res.data);
+    } catch {
+      toast.error('Error al actualizar la beraja');
+    }
+  };
 
   if (cargando) return <div style={{ textAlign: 'center', padding: '4rem', color: '#718096' }}>Cargando producto...</div>;
   if (!producto) return null;
@@ -108,6 +150,45 @@ const ProductoDetallePage = () => {
               </div>
             )}
 
+            {/* Beraja */}
+            <div style={{ marginBottom: '1rem' }}>
+              {producto.beraja && BERAJA_LABELS[producto.beraja] && !editandoBeraja && (() => {
+                const b = BERAJA_LABELS[producto.beraja];
+                return (
+                  <span
+                    onClick={() => usuario && ['validador','administrador','intermedio'].includes(usuario.rol) && setEditandoBeraja(true)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 14px', borderRadius: '20px', fontWeight: 700, fontSize: '0.875rem', color: b.color, background: b.bg, border: `1px solid ${b.color}`, cursor: usuario && ['validador','administrador','intermedio'].includes(usuario.rol) ? 'pointer' : 'default' }}>
+                    {b.emoji} {b.texto}
+                    {usuario && ['validador','administrador','intermedio'].includes(usuario.rol) && <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>✏️</span>}
+                  </span>
+                );
+              })()}
+              {!producto.beraja && usuario && ['validador','administrador','intermedio'].includes(usuario.rol) && !editandoBeraja && (
+                <button onClick={() => setEditandoBeraja(true)} style={{ padding: '4px 12px', background: '#f7fafc', border: '1px dashed #cbd5e0', borderRadius: '20px', cursor: 'pointer', fontSize: '0.8rem', color: '#718096' }}>
+                  + Asignar beraja
+                </button>
+              )}
+              {editandoBeraja && (
+                <div style={{ background: '#f7fafc', borderRadius: '10px', padding: '0.875rem', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#2d3748', marginBottom: '8px' }}>Selecciona la beraja:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                    {Object.entries(BERAJA_LABELS).map(([val, b]) => (
+                      <button key={val} onClick={() => handleGuardarBeraja(val)}
+                        style={{ padding: '6px 12px', borderRadius: '20px', border: `1px solid ${b.color}`, background: producto.beraja === val ? b.bg : 'white', color: b.color, cursor: 'pointer', fontSize: '0.8rem', fontWeight: producto.beraja === val ? 700 : 400 }}>
+                        {b.emoji} {b.texto}
+                      </button>
+                    ))}
+                    {producto.beraja && (
+                      <button onClick={() => handleGuardarBeraja(null)} style={{ padding: '6px 12px', borderRadius: '20px', border: '1px solid #e2e8f0', background: 'white', color: '#718096', cursor: 'pointer', fontSize: '0.8rem' }}>
+                        ✕ Quitar beraja
+                      </button>
+                    )}
+                  </div>
+                  <button onClick={() => setEditandoBeraja(false)} style={{ fontSize: '0.78rem', color: '#718096', background: 'none', border: 'none', cursor: 'pointer' }}>Cancelar</button>
+                </div>
+              )}
+            </div>
+
             {/* Campos */}
             <div style={{ fontSize: '0.88rem' }}>
               {producto.gramaje && <div style={campo}><span style={{ color: '#718096', minWidth: '100px' }}>Gramaje:</span><span style={{ color: '#2d3748', fontWeight: 500 }}>{producto.gramaje}</span></div>}
@@ -115,6 +196,15 @@ const ProductoDetallePage = () => {
               {producto.fabricante && <div style={campo}><span style={{ color: '#718096', minWidth: '100px' }}>Fabricante:</span><span style={{ color: '#2d3748', fontWeight: 500 }}>{producto.fabricante}</span></div>}
               {producto.codigo_barras && <div style={campo}><span style={{ color: '#718096', minWidth: '100px' }}>Cód. barras:</span><span style={{ color: '#2d3748', fontWeight: 500 }}>{producto.codigo_barras}</span></div>}
             </div>
+
+            {/* Botón borrar - solo admin */}
+            {usuario?.rol === 'administrador' && (
+              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #fee2e2' }}>
+                <button onClick={() => setModalBorrar(true)} style={{ padding: '7px 16px', background: '#fff5f5', color: '#c53030', border: '1px solid #fed7d7', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                  🗑️ Eliminar producto
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -157,6 +247,48 @@ const ProductoDetallePage = () => {
 
         <AportacionesSection productoId={id} />
       </div>
+
+      {/* Modal borrar producto */}
+      {modalBorrar && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', maxWidth: '460px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#c53030', marginBottom: '0.5rem' }}>🗑️ Eliminar producto</h2>
+            <p style={{ color: '#4a5568', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Vas a eliminar <strong>{producto.nombre} — {producto.marca}</strong>. Esta acción no se puede deshacer.
+            </p>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#2d3748', marginBottom: '6px' }}>
+                Motivo de eliminación *
+              </label>
+              <textarea
+                value={motivoBorrar}
+                onChange={e => setMotivoBorrar(e.target.value)}
+                placeholder="Ej: Producto descatalogado, información incorrecta..."
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', minHeight: '80px', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '1.25rem', fontSize: '0.875rem', color: '#2d3748' }}>
+              <input
+                type="checkbox"
+                checked={notificarEmail}
+                onChange={e => setNotificarEmail(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              ✉️ Enviar email de notificación a quien subió el producto
+            </label>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={handleBorrarProducto} disabled={borrando}
+                style={{ flex: 1, padding: '10px', background: '#c53030', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }}>
+                {borrando ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
+              <button onClick={() => { setModalBorrar(false); setMotivoBorrar(''); }}
+                style={{ flex: 1, padding: '10px', background: '#edf2f7', color: '#4a5568', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

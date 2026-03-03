@@ -2,7 +2,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
-const { buscarProductos, obtenerProducto, crearProducto, obtenerPendientes, misProductos, retirarProducto } = require('../controllers/productos.controller');
+const { buscarProductos, obtenerProducto, crearProducto, obtenerPendientes, misProductos, retirarProducto, borrarProducto, actualizarBeraja, edicionMasiva, listarProductosAdmin } = require('../controllers/productos.controller');
 const { verificarToken, requiereRol } = require('../middleware/auth.middleware');
 const { upload } = require('../config/cloudinary');
 
@@ -32,7 +32,19 @@ router.post('/', verificarToken, requiereRol('regular', 'administrador'), upload
   body('justificacion').trim().isLength({ min: 20 }).withMessage('La justificación debe tener al menos 20 caracteres'),
 ], crearProducto);
 
-// Retirar producto
-router.delete('/:id', verificarToken, retirarProducto);
+// Retirar producto (dueño si pendiente)
+router.delete('/:id/retirar', verificarToken, retirarProducto);
+
+// Borrar producto (solo admin)
+router.delete('/:id', verificarToken, requiereRol('administrador'), borrarProducto);
+
+// Actualizar beraja (validador/admin)
+router.patch('/:id/beraja', verificarToken, requiereRol('validador', 'administrador'), actualizarBeraja);
+
+// Edición masiva (solo admin)
+router.post('/admin/edicion-masiva', verificarToken, requiereRol('administrador'), edicionMasiva);
+
+// Listar todos los productos para admin
+router.get('/admin/listar', verificarToken, requiereRol('administrador'), listarProductosAdmin);
 
 module.exports = router;

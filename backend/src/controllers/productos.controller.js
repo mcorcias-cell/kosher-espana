@@ -227,3 +227,204 @@ const retirarProducto = async (req, res) => {
 };
 
 module.exports = { buscarProductos, obtenerProducto, crearProducto, obtenerPendientes, misProductos, retirarProducto };
+
+// ─── Borrar producto (admin) con motivo y email opcional ──────────────────────
+const borrarProducto = async (req, res) => {
+  const { id } = req.params;
+  const { motivo, notificar_email } = req.body;
+
+  if (!motivo || motivo.trim().length < 5) {
+    return res.status(400).json({ error: 'El motivo de eliminación es obligatorio (mínimo 5 caracteres)' });
+  }
+
+  try {
+    const prod = await pool.query(
+      `SELECT p.*, u.email AS subido_por_email, u.nombre AS subido_por_nombre
+       FROM productos p LEFT JOIN users u ON p.subido_por = u.id
+       WHERE p.id = $1`, [id]
+    );
+    if (!prod.rows[0]) return res.status(404).json({ error: 'Producto no encontrado' });
+
+    const producto = prod.rows[0];
+
+    // Borrar imagen de Cloudinary si existe
+    if (producto.imagen_public_id) {
+      await cloudinary.uploader.destroy(producto.imagen_public_id).catch(() => {});
+    }
+
+    // Borrar producto (cascada borrará validaciones, feedback, categorias)
+    await pool.query('DELETE FROM productos WHERE id = $1', [id]);
+
+    // Email opcional
+    if (notificar_email && producto.subido_por_email) {
+      try {
+        const nodemailer = require('nodemailer');
+        const transporter = nodemailer.createTransport({
+          host: 'smtp.resend.com',
+          port: 465,
+          secure: true,
+          auth: { user: 'resend', pass: process.env.RESEND_API_KEY },
+        });
+        await transporter.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: producto.subido_por_email,
+          subject: `Tu producto "${producto.nombre}" ha sido eliminado de Kosher España`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
+              <h2>✡️ Kosher España</h2>
+              <p>Hola <strong>${producto.subido_por_nombre}</strong>,</p>
+              <p>Te informamos que el producto <strong>${producto.nombre} (${producto.marca})</strong> ha sido eliminado de la plataforma por el equipo de administración.</p>
+              <div style="background: #f7fafc; border-left: 4px solid #2b6cb0; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
+                <strong>Motivo:</strong><br/>${motivo}
+              </div>
+              <p>Si tienes alguna pregunta puedes contactarnos respondiendo a este email.</p>
+              <p>El equipo de Kosher España</p>
+            </div>
+          `,
+        });
+      } catch (emailErr) {
+        console.error('Error enviando email de notificación:', emailErr.message);
+        // No fallar la operación por un error de email
+      }
+    }
+
+    res.json({ mensaje: 'Producto eliminado correctamente' });
+  } catch (err) {
+    console.error('Error borrando producto:', err);
+    res.status(500).json({ error: 'Error al eliminar el producto' });
+  }
+};
+
+// ─── Actualizar beraja (validador/admin) ──────────────────────────────────────
+const actualizarBeraja = async (req, res) => {
+  const { id } = req.params;
+  const { beraja } = req.body;
+  const BERAJOT_VALIDAS = ['hamotzi', 'mezonot', 'peri_haguefen', 'haetz', 'haadama', 'sheakol'];
+
+  if (beraja && !BERAJOT_VALIDAS.includes(beraja)) {
+    return res.status(400).json({ error: 'Beraja no válida' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE productos SET beraja = $1, updated_at = NOW() WHERE id = $2 RETURNING id',
+      [beraja || null, id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Producto no encontrado' });
+    res.json({ mensaje: 'Beraja actualizada correctamente' });
+  } catch (err) {
+    console.error('Error actualizando beraja:', err);
+    res.status(500).json({ error: 'Error al actualizar la beraja' });
+  }
+};
+
+// ─── Edición masiva (admin) ───────────────────────────────────────────────────
+const edicionMasiva = async (req, res) => {
+  const { producto_ids, campo, valor, categoria_ids, modo_categoria } = req.body;
+  // modo_categoria: 'agregar' | 'reemplazar'
+
+  if (!producto_ids || producto_ids.length === 0) {
+    return res.status(400).json({ error: 'Selecciona al menos un producto' });
+  }
+
+  const CAMPOS_PERMITIDOS = ['tipo_kosher', 'beraja'];
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+    let actualizados = 0;
+
+    if (campo === 'categoria') {
+      // Edición masiva de categorías
+      for (const pid of producto_ids) {
+        if (modo_categoria === 'reemplazar') {
+          await client.query('DELETE FROM producto_categorias WHERE producto_id = $1', [pid]);
+        }
+        for (const cid of (categoria_ids || [])) {
+          const existe = await client.query(
+            'SELECT 1 FROM producto_categorias WHERE producto_id = $1 AND categoria_id = $2',
+            [pid, cid]
+          );
+          if (existe.rows.length === 0) {
+            await client.query(
+              'INSERT INTO producto_categorias (producto_id, categoria_id) VALUES ($1, $2)',
+              [pid, cid]
+            );
+          }
+        }
+        actualizados++;
+      }
+    } else if (CAMPOS_PERMITIDOS.includes(campo)) {
+      const placeholders = producto_ids.map((_, i) => `$${i + 2}`).join(',');
+      await client.query(
+        `UPDATE productos SET ${campo} = $1, updated_at = NOW() WHERE id IN (${placeholders})`,
+        [valor || null, ...producto_ids]
+      );
+      actualizados = producto_ids.length;
+    } else {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Campo no permitido para edición masiva' });
+    }
+
+    await client.query('COMMIT');
+    res.json({ mensaje: `${actualizados} productos actualizados correctamente` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error en edición masiva:', err);
+    res.status(500).json({ error: 'Error en edición masiva' });
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Listar todos los productos para admin (con filtros) ──────────────────────
+const listarProductosAdmin = async (req, res) => {
+  const { nombre, marca, estado, page = 1, limit = 20 } = req.query;
+  const offset = (page - 1) * limit;
+  const params = [];
+  const condiciones = [];
+
+  if (nombre) { params.push(`%${nombre}%`); condiciones.push(`p.nombre ILIKE $${params.length}`); }
+  if (marca) { params.push(`%${marca}%`); condiciones.push(`p.marca ILIKE $${params.length}`); }
+  if (estado) { params.push(estado); condiciones.push(`p.estado = $${params.length}`); }
+
+  const where = condiciones.length > 0 ? 'WHERE ' + condiciones.join(' AND ') : '';
+
+  try {
+    params.push(limit, offset);
+    const result = await pool.query(`
+      SELECT p.id, p.nombre, p.marca, p.estado, p.tipo_kosher, p.beraja,
+             p.imagen_url, p.created_at, u.nombre AS subido_por_nombre,
+             json_agg(DISTINCT jsonb_build_object('nombre', c.nombre, 'icono', c.icono))
+               FILTER (WHERE c.id IS NOT NULL) AS categorias
+      FROM productos p
+      LEFT JOIN users u ON p.subido_por = u.id
+      LEFT JOIN producto_categorias pc ON pc.producto_id = p.id
+      LEFT JOIN categorias c ON c.id = pc.categoria_id
+      ${where}
+      GROUP BY p.id, u.nombre
+      ORDER BY p.created_at DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}
+    `, params);
+
+    const countResult = await pool.query(
+      `SELECT COUNT(DISTINCT p.id) FROM productos p ${where}`,
+      params.slice(0, -2)
+    );
+
+    res.json({
+      productos: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      total_paginas: Math.ceil(parseInt(countResult.rows[0].count) / limit),
+    });
+  } catch (err) {
+    console.error('Error listando productos admin:', err);
+    res.status(500).json({ error: 'Error al listar productos' });
+  }
+};
+
+module.exports = {
+  buscarProductos, obtenerProducto, crearProducto,
+  obtenerPendientes, misProductos, retirarProducto,
+  borrarProducto, actualizarBeraja, edicionMasiva, listarProductosAdmin,
+};

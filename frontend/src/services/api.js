@@ -32,7 +32,11 @@ export const productosService = {
   crear: (formData) => api.post('/productos', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   pendientes: () => api.get('/productos/pendientes'),
   misProductos: () => api.get('/productos/mis-productos'),
-  retirar: (id) => api.delete(`/productos/${id}`),
+  retirar: (id) => api.delete(`/productos/${id}/retirar`),
+  borrar: (id, datos) => api.delete(`/productos/${id}`, { data: datos }),
+  actualizarBeraja: (id, beraja) => api.patch(`/productos/${id}/beraja`, { beraja }),
+  edicionMasiva: (datos) => api.post('/productos/admin/edicion-masiva', datos),
+  listarAdmin: (params) => api.get('/productos/admin/listar', { params }),
 };
 
 export const validacionesService = {
