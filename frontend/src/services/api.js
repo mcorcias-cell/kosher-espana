@@ -37,6 +37,7 @@ export const productosService = {
   actualizarBeraja: (id, beraja) => api.patch(`/productos/${id}/beraja`, { beraja }),
   edicionMasiva: (datos) => api.post('/productos/admin/edicion-masiva', datos),
   listarAdmin: (params) => api.get('/productos/admin/listar', { params }),
+  actualizarAdmin: (id, datos) => api.put(`/productos/admin/${id}`, datos),
 };
 
 export const validacionesService = {

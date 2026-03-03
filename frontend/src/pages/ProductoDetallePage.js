@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { productosService } from '../services/api';
+import { productosService, categoriasService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import AportacionesSection from '../components/feedback/AportacionesSection';
@@ -29,23 +29,98 @@ const BERAJA_LABELS = {
   sheakol:      { texto: 'שהכל Sheakol',         emoji: '🌟', color: '#2b6cb0', bg: '#ebf8ff' },
 };
 
+const ScrollCarousel = ({ titulo, productos, verTodosUrl, navigate }) => {
+  if (!productos || productos.length === 0) return null;
+  return (
+    <div style={{ marginTop: '2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#2d3748', margin: 0 }}>{titulo}</h3>
+        <button
+          onClick={() => navigate(verTodosUrl)}
+          style={{ background: 'none', border: 'none', color: '#2b6cb0', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, padding: 0 }}>
+          Ver todos →
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem', scrollbarWidth: 'thin' }}>
+        {productos.map(p => (
+          <div
+            key={p.id}
+            onClick={() => navigate(`/producto/${p.id}`)}
+            style={{ flexShrink: 0, width: '140px', background: 'white', borderRadius: '10px', border: '1px solid #e2e8f0', cursor: 'pointer', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', transition: 'box-shadow 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)'}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)'}
+          >
+            <div style={{ width: '100%', height: '100px', background: '#f7fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {p.imagen_url
+                ? <img src={p.imagen_url} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <span style={{ fontSize: '2rem' }}>📦</span>
+              }
+            </div>
+            <div style={{ padding: '8px' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#2d3748', lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{p.nombre}</div>
+              <div style={{ fontSize: '0.72rem', color: '#718096', marginTop: '3px' }}>{p.marca}</div>
+              {p.tipo_kosher && (
+                <div style={{ fontSize: '0.68rem', marginTop: '4px', color: '#2b6cb0', fontWeight: 600 }}>
+                  {p.tipo_kosher === 'pareve' ? '🔵' : p.tipo_kosher === 'lacteo' ? '🟡' : p.tipo_kosher === 'carnico' ? '🔴' : '🐟'} {p.tipo_kosher}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+
 const ProductoDetallePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { usuario } = useAuth();
   const isMobile = useIsMobile();
+  const { usuario } = useAuth();
   const [producto, setProducto] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [navIds, setNavIds] = useState([]);
+  const [sugerenciasMarca, setSugerenciasMarca] = useState([]);
+  const [sugerenciasCategoria, setSugerenciasCategoria] = useState([]);
   const [modalBorrar, setModalBorrar] = useState(false);
   const [motivoBorrar, setMotivoBorrar] = useState('');
   const [notificarEmail, setNotificarEmail] = useState(true);
   const [borrando, setBorrando] = useState(false);
   const [editandoBeraja, setEditandoBeraja] = useState(false);
+  const [editandoCategorias, setEditandoCategorias] = useState(false);
+  const [todasCategorias, setTodasCategorias] = useState([]);
+  const [catsSeleccionadas, setCatsSeleccionadas] = useState([]);
 
 
   useEffect(() => {
+    setCargando(true);
+    setSugerenciasMarca([]);
+    setSugerenciasCategoria([]);
+
+    // Cargar IDs de navegación desde sessionStorage
+    try {
+      const stored = sessionStorage.getItem('kosher_nav_ids');
+      if (stored) setNavIds(JSON.parse(stored));
+    } catch { setNavIds([]); }
+
     productosService.obtener(id)
-      .then(res => setProducto(res.data))
+      .then(res => {
+        setProducto(res.data);
+        const p = res.data;
+
+        // Sugerencias misma marca
+        productosService.buscar({ marca: p.marca, limit: 9 })
+          .then(r => setSugerenciasMarca(r.data.productos.filter(x => x.id !== id).slice(0, 8)))
+          .catch(() => {});
+
+        // Sugerencias misma categoría (primera categoría del producto)
+        if (p.categorias && p.categorias.length > 0) {
+          productosService.buscar({ categoria_id: p.categorias[0].id, limit: 9 })
+            .then(r => setSugerenciasCategoria(r.data.productos.filter(x => x.id !== id).slice(0, 8)))
+            .catch(() => {});
+        }
+      })
       .catch(() => navigate('/'))
       .finally(() => setCargando(false));
   }, [id, navigate]);
@@ -79,6 +154,27 @@ const ProductoDetallePage = () => {
     }
   };
 
+  const abrirEditarCategorias = async () => {
+    if (todasCategorias.length === 0) {
+      const res = await categoriasService.listar().catch(() => ({ data: [] }));
+      setTodasCategorias(res.data);
+    }
+    setCatsSeleccionadas((producto.categorias || []).map(c => c.id));
+    setEditandoCategorias(true);
+  };
+
+  const handleGuardarCategorias = async () => {
+    try {
+      await categoriasService.asignarAProducto(id, catsSeleccionadas);
+      toast.success('Categorías actualizadas');
+      setEditandoCategorias(false);
+      const res = await productosService.obtener(id);
+      setProducto(res.data);
+    } catch {
+      toast.error('Error al actualizar categorías');
+    }
+  };
+
   if (cargando) return <div style={{ textAlign: 'center', padding: '4rem', color: '#718096' }}>Cargando producto...</div>;
   if (!producto) return null;
 
@@ -89,9 +185,36 @@ const ProductoDetallePage = () => {
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: isMobile ? '0.75rem' : '2rem 1rem' }}>
-      <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: '#2b6cb0', cursor: 'pointer', marginBottom: '0.75rem', fontSize: '0.9rem', padding: 0 }}>
-        ← Volver
-      </button>
+      {/* Navegación anterior / siguiente */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: '#2b6cb0', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }}>
+          ← Volver
+        </button>
+        {navIds.length > 1 && (() => {
+          const idx = navIds.indexOf(id);
+          const prevId = idx > 0 ? navIds[idx - 1] : null;
+          const nextId = idx < navIds.length - 1 ? navIds[idx + 1] : null;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                onClick={() => navigate(`/producto/${prevId}`)}
+                disabled={!prevId}
+                style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', background: prevId ? 'white' : '#f7fafc', color: prevId ? '#2b6cb0' : '#a0aec0', cursor: prevId ? 'pointer' : 'not-allowed', fontSize: '0.85rem', fontWeight: 600 }}>
+                ‹ Anterior
+              </button>
+              <span style={{ fontSize: '0.75rem', color: '#a0aec0' }}>
+                {idx + 1} / {navIds.length}
+              </span>
+              <button
+                onClick={() => navigate(`/producto/${nextId}`)}
+                disabled={!nextId}
+                style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', background: nextId ? 'white' : '#f7fafc', color: nextId ? '#2b6cb0' : '#a0aec0', cursor: nextId ? 'pointer' : 'not-allowed', fontSize: '0.85rem', fontWeight: 600 }}>
+                Siguiente ›
+              </button>
+            </div>
+          );
+        })()}
+      </div>
 
       <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
         {/* Header: imagen + info */}
@@ -118,21 +241,57 @@ const ProductoDetallePage = () => {
             <h1 style={{ fontSize: isMobile ? '1.3rem' : '1.6rem', fontWeight: 700, color: '#1a365d', margin: '0 0 6px' }}>{producto.nombre}</h1>
             <p style={{ fontSize: '1rem', color: '#718096', margin: '0 0 1rem' }}>{producto.marca}</p>
 
-            {/* Tipo kosher + Categorías */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '1rem' }}>
-              {!isMobile && producto.tipo_kosher && KOSHER_LABELS[producto.tipo_kosher] && (() => {
-                const k = KOSHER_LABELS[producto.tipo_kosher];
-                return (
+            {/* Tipo kosher */}
+            {producto.tipo_kosher && KOSHER_LABELS[producto.tipo_kosher] && !isMobile && (() => {
+              const k = KOSHER_LABELS[producto.tipo_kosher];
+              return (
+                <div style={{ marginBottom: '0.5rem' }}>
                   <span style={{ padding: '5px 14px', borderRadius: '20px', fontWeight: 700, fontSize: '0.875rem', color: k.color, background: k.bg, border: `1px solid ${k.color}` }}>
                     {k.emoji} {k.texto}
                   </span>
-                );
-              })()}
-              {producto.categorias && producto.categorias.map((c, i) => (
-                <span key={i} style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', background: '#f0fff4', color: '#276749', border: '1px solid #c6f6d5' }}>
-                  {c.icono} {c.nombre}
-                </span>
-              ))}
+                </div>
+              );
+            })()}
+
+            {/* Categorías — siempre visibles, editables por validador/admin */}
+            <div style={{ marginBottom: '1rem' }}>
+              {!editandoCategorias ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                  {producto.categorias && producto.categorias.length > 0
+                    ? producto.categorias.map((c, i) => (
+                        <span key={i} style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', background: '#f0fff4', color: '#276749', border: '1px solid #c6f6d5' }}>
+                          {c.icono} {c.nombre}
+                        </span>
+                      ))
+                    : <span style={{ fontSize: '0.8rem', color: '#a0aec0' }}>Sin categoría asignada</span>
+                  }
+                  {usuario && ['validador','administrador','intermedio'].includes(usuario.rol) && (
+                    <button onClick={abrirEditarCategorias}
+                      style={{ padding: '3px 10px', background: '#f7fafc', border: '1px dashed #cbd5e0', borderRadius: '20px', cursor: 'pointer', fontSize: '0.75rem', color: '#718096' }}>
+                      ✏️ Editar
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div style={{ background: '#f7fafc', borderRadius: '10px', padding: '0.875rem', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#2d3748', marginBottom: '8px' }}>Selecciona las categorías:</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '4px', maxHeight: '240px', overflowY: 'auto', marginBottom: '10px' }}>
+                    {todasCategorias.map(c => {
+                      const sel = catsSeleccionadas.includes(c.id);
+                      return (
+                        <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', background: sel ? '#f0fff4' : 'white', border: `1px solid ${sel ? '#c6f6d5' : '#e2e8f0'}`, fontSize: '0.82rem' }}>
+                          <input type="checkbox" checked={sel} onChange={() => setCatsSeleccionadas(cs => sel ? cs.filter(x => x !== c.id) : [...cs, c.id])} style={{ cursor: 'pointer' }} />
+                          {c.icono} {c.nombre}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={handleGuardarCategorias} style={{ padding: '6px 14px', background: '#2b6cb0', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}>Guardar</button>
+                    <button onClick={() => setEditandoCategorias(false)} style={{ padding: '6px 12px', background: '#edf2f7', color: '#4a5568', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem' }}>Cancelar</button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sellos de validación */}
@@ -242,6 +401,30 @@ const ProductoDetallePage = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Sugerencias misma marca */}
+        {sugerenciasMarca.length > 0 && (
+          <div style={{ padding: isMobile ? '1rem' : '1.5rem', borderTop: '1px solid #e2e8f0' }}>
+            <ScrollCarousel
+              titulo={`🏷️ Más productos de ${producto.marca}`}
+              productos={sugerenciasMarca}
+              verTodosUrl={`/?marca=${encodeURIComponent(producto.marca)}`}
+              navigate={navigate}
+            />
+          </div>
+        )}
+
+        {/* Sugerencias misma categoría */}
+        {sugerenciasCategoria.length > 0 && producto.categorias && producto.categorias.length > 0 && (
+          <div style={{ padding: isMobile ? '1rem' : '1.5rem', borderTop: '1px solid #e2e8f0' }}>
+            <ScrollCarousel
+              titulo={`${producto.categorias[0].icono} Más productos de ${producto.categorias[0].nombre}`}
+              productos={sugerenciasCategoria}
+              verTodosUrl={`/?categoria_id=${producto.categorias[0].id}`}
+              navigate={navigate}
+            />
           </div>
         )}
 

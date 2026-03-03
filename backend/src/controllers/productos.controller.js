@@ -423,8 +423,39 @@ const listarProductosAdmin = async (req, res) => {
   }
 };
 
+// ─── Actualizar producto completo (admin) ─────────────────────────────────────
+const actualizarProductoAdmin = async (req, res) => {
+  const { id } = req.params;
+  const { nombre, marca, fabricante, gramaje, sabor_variante, codigo_barras, tipo_kosher, beraja, estado } = req.body;
+
+  if (!nombre || !marca) return res.status(400).json({ error: 'Nombre y marca son obligatorios' });
+
+  const ESTADOS = ['validado', 'pendiente', 'rechazado', 'retirado'];
+  if (estado && !ESTADOS.includes(estado)) return res.status(400).json({ error: 'Estado no válido' });
+
+  try {
+    const result = await pool.query(
+      `UPDATE productos SET
+        nombre = $1, marca = $2, fabricante = $3, gramaje = $4,
+        sabor_variante = $5, codigo_barras = $6, tipo_kosher = $7,
+        beraja = $8, estado = $9,
+        visible = CASE WHEN $9 = 'validado' THEN true ELSE visible END,
+        updated_at = NOW()
+       WHERE id = $10 RETURNING id`,
+      [nombre, marca, fabricante || null, gramaje || null, sabor_variante || null,
+       codigo_barras || null, tipo_kosher || null, beraja || null, estado || 'pendiente', id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Producto no encontrado' });
+    res.json({ mensaje: 'Producto actualizado correctamente' });
+  } catch (err) {
+    console.error('Error actualizando producto:', err);
+    res.status(500).json({ error: 'Error al actualizar el producto' });
+  }
+};
+
 module.exports = {
   buscarProductos, obtenerProducto, crearProducto,
   obtenerPendientes, misProductos, retirarProducto,
   borrarProducto, actualizarBeraja, edicionMasiva, listarProductosAdmin,
+  actualizarProductoAdmin,
 };

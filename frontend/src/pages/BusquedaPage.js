@@ -1,6 +1,6 @@
 // src/pages/BusquedaPage.js
 import React, { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { productosService, categoriasService } from '../services/api';
 import TarjetaProducto from '../components/products/TarjetaProducto';
 import { useIsMobile } from '../hooks/useMediaQuery';
@@ -15,6 +15,7 @@ const KOSHER_TIPOS = [
 const BusquedaPage = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const location = useLocation();
   const [filtros, setFiltros] = useState({ nombre: '', marca: '', fabricante: '', codigo_barras: '' });
   const [categoriaActiva, setCategoriaActiva] = useState(null);
   const [categoriaActivaNombre, setCategoriaActivaNombre] = useState('');
@@ -27,8 +28,23 @@ const BusquedaPage = () => {
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
 
   useEffect(() => {
-    categoriasService.listar().then(res => setCategorias(res.data)).catch(() => {});
-    buscar(1, null, null);
+    categoriasService.listar().then(res => {
+      setCategorias(res.data);
+      // Leer parámetros de URL (desde "Ver todos" en sugerencias)
+      const params = new URLSearchParams(location.search);
+      const marcaParam = params.get('marca');
+      const catParam = params.get('categoria_id');
+      if (marcaParam) {
+        setFiltros(f => ({ ...f, marca: marcaParam }));
+        buscar(1, null, null);
+      } else if (catParam) {
+        const catId = catParam;
+        setCategoriaActiva(catId);
+        buscar(1, catId, null);
+      } else {
+        buscar(1, null, null);
+      }
+    }).catch(() => { buscar(1, null, null); });
   }, []);
 
   const buscar = useCallback(async (pag = 1, catId = categoriaActiva, tipo = tipoKosher) => {
@@ -214,7 +230,11 @@ const BusquedaPage = () => {
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(240px, 1fr))', gap: isMobile ? '0.75rem' : '1.25rem' }}>
                     {resultados.productos.map(p => (
-                      <TarjetaProducto key={p.id} producto={p} onClick={() => navigate(`/producto/${p.id}`)} />
+                      <TarjetaProducto key={p.id} producto={p} onClick={() => {
+                        sessionStorage.setItem('kosher_nav_ids', JSON.stringify(resultados.productos.map(x => x.id)));
+                        sessionStorage.setItem('kosher_nav_pagina', pagina);
+                        navigate(`/producto/${p.id}`);
+                      }} />
                     ))}
                   </div>
                   {resultados.total_paginas > 1 && (

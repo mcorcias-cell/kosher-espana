@@ -31,6 +31,10 @@ const PanelAdminPage = () => {
   const [motivoBorrar, setMotivoBorrar] = useState('');
   const [notificarEmail, setNotificarEmail] = useState(true);
   const [borrando, setBorrando] = useState(false);
+  const [modalEditar, setModalEditar] = useState(null); // producto a editar
+  const [formEditar, setFormEditar] = useState({});
+  const [catsEditando, setCatsEditando] = useState([]);
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   // Edición masiva
   const [seleccionados, setSeleccionados] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -176,6 +180,54 @@ const PanelAdminPage = () => {
       cargarProductosAdmin(paginaProductos);
     } catch { toast.error('Error al eliminar'); }
     finally { setBorrando(false); }
+  };
+
+  const abrirModalEditar = async (p) => {
+    if (categorias.length === 0) {
+      const res = await categoriasService.listar().catch(() => ({ data: [] }));
+      setCategorias(res.data);
+    }
+    setFormEditar({
+      nombre: p.nombre || '',
+      marca: p.marca || '',
+      fabricante: p.fabricante || '',
+      gramaje: p.gramaje || '',
+      sabor_variante: p.sabor_variante || '',
+      codigo_barras: p.codigo_barras || '',
+      tipo_kosher: p.tipo_kosher || '',
+      beraja: p.beraja || '',
+      estado: p.estado || '',
+    });
+    setCatsEditando((p.categorias || []).map(c => c.id).filter(Boolean));
+    setModalEditar(p);
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!formEditar.nombre || !formEditar.marca) return toast.error('Nombre y marca son obligatorios');
+    setGuardandoEdicion(true);
+    try {
+      // Update product fields
+      await productosService.actualizarAdmin(modalEditar.id, {
+        nombre: formEditar.nombre,
+        marca: formEditar.marca,
+        fabricante: formEditar.fabricante,
+        gramaje: formEditar.gramaje,
+        sabor_variante: formEditar.sabor_variante,
+        codigo_barras: formEditar.codigo_barras,
+        tipo_kosher: formEditar.tipo_kosher || null,
+        beraja: formEditar.beraja || null,
+        estado: formEditar.estado,
+      });
+      // Update categories
+      await categoriasService.asignarAProducto(modalEditar.id, catsEditando);
+      toast.success('✅ Producto actualizado');
+      setModalEditar(null);
+      cargarProductosAdmin(paginaProductos);
+    } catch {
+      toast.error('Error al guardar cambios');
+    } finally {
+      setGuardandoEdicion(false);
+    }
   };
 
   const handleEdicionMasiva = async () => {
@@ -453,6 +505,7 @@ const PanelAdminPage = () => {
                         <td style={td}>
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <button onClick={() => navigate(`/producto/${p.id}`)} style={{ padding: '4px 10px', background: '#ebf8ff', color: '#2b6cb0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem' }}>Ver</button>
+                            <button onClick={() => abrirModalEditar(p)} style={{ padding: '4px 10px', background: '#f0fff4', color: '#276749', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem' }}>✏️</button>
                             <button onClick={() => { setModalBorrar(p); setMotivoBorrar(''); setNotificarEmail(true); }} style={{ padding: '4px 10px', background: '#fff5f5', color: '#c53030', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem' }}>🗑️</button>
                           </div>
                         </td>
@@ -579,6 +632,99 @@ const PanelAdminPage = () => {
               style={{ width: '100%', padding: '10px', background: seleccionados.length === 0 ? '#e2e8f0' : '#2b6cb0', color: seleccionados.length === 0 ? '#a0aec0' : 'white', border: 'none', borderRadius: '8px', cursor: seleccionados.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.9rem' }}>
               {aplicando ? 'Aplicando...' : `Aplicar a ${seleccionados.length} producto${seleccionados.length !== 1 ? 's' : ''}`}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar producto */}
+      {modalEditar && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', overflowY: 'auto' }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', maxWidth: '580px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1a365d', margin: 0 }}>✏️ Editar producto</h2>
+              <button onClick={() => setModalEditar(null)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#718096' }}>✕</button>
+            </div>
+
+            {/* Campos en grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+              {[
+                { label: 'Nombre *', key: 'nombre' },
+                { label: 'Marca *', key: 'marca' },
+                { label: 'Fabricante', key: 'fabricante' },
+                { label: 'Gramaje', key: 'gramaje' },
+                { label: 'Sabor / Variante', key: 'sabor_variante' },
+                { label: 'Código de barras', key: 'codigo_barras' },
+              ].map(({ label, key }) => (
+                <div key={key}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#4a5568', marginBottom: '3px' }}>{label}</label>
+                  <input
+                    value={formEditar[key] || ''}
+                    onChange={e => setFormEditar(f => ({ ...f, [key]: e.target.value }))}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Selectores */}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#4a5568', marginBottom: '3px' }}>Tipo Kosher</label>
+                <select value={formEditar.tipo_kosher || ''} onChange={e => setFormEditar(f => ({ ...f, tipo_kosher: e.target.value }))}
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
+                  <option value="">— Sin tipo —</option>
+                  <option value="pareve">🔵 Páreve</option>
+                  <option value="lacteo">🟡 Lácteo</option>
+                  <option value="carnico">🔴 Cárnico</option>
+                  <option value="pescado">🐟 Pescado</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#4a5568', marginBottom: '3px' }}>Beraja</label>
+                <select value={formEditar.beraja || ''} onChange={e => setFormEditar(f => ({ ...f, beraja: e.target.value }))}
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
+                  <option value="">— Sin beraja —</option>
+                  {BERAJOT.map(b => <option key={b} value={b}>{BERAJOT_LABELS[b]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#4a5568', marginBottom: '3px' }}>Estado</label>
+                <select value={formEditar.estado || ''} onChange={e => setFormEditar(f => ({ ...f, estado: e.target.value }))}
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
+                  <option value="validado">✅ Validado</option>
+                  <option value="pendiente">⏳ Pendiente</option>
+                  <option value="rechazado">❌ Rechazado</option>
+                  <option value="retirado">🚫 Retirado</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Categorías */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Categorías</label>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '4px', maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px' }}>
+                {categorias.map(c => {
+                  const sel = catsEditando.includes(c.id);
+                  return (
+                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '5px 7px', borderRadius: '6px', cursor: 'pointer', background: sel ? '#f0fff4' : 'white', border: `1px solid ${sel ? '#c6f6d5' : 'transparent'}`, fontSize: '0.82rem' }}>
+                      <input type="checkbox" checked={sel} onChange={() => setCatsEditando(cs => sel ? cs.filter(x => x !== c.id) : [...cs, c.id])} style={{ cursor: 'pointer' }} />
+                      {c.icono} {c.nombre}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={handleGuardarEdicion} disabled={guardandoEdicion}
+                style={{ flex: 1, padding: '10px', background: '#2b6cb0', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }}>
+                {guardandoEdicion ? 'Guardando...' : '💾 Guardar cambios'}
+              </button>
+              <button onClick={() => setModalEditar(null)}
+                style={{ padding: '10px 20px', background: '#edf2f7', color: '#4a5568', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

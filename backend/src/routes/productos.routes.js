@@ -2,7 +2,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
-const { buscarProductos, obtenerProducto, crearProducto, obtenerPendientes, misProductos, retirarProducto, borrarProducto, actualizarBeraja, edicionMasiva, listarProductosAdmin } = require('../controllers/productos.controller');
+const { buscarProductos, obtenerProducto, crearProducto, obtenerPendientes, misProductos, retirarProducto, borrarProducto, actualizarBeraja, edicionMasiva, listarProductosAdmin, actualizarProductoAdmin } = require('../controllers/productos.controller');
 const { verificarToken, requiereRol } = require('../middleware/auth.middleware');
 const { upload } = require('../config/cloudinary');
 
@@ -46,5 +46,8 @@ router.post('/admin/edicion-masiva', verificarToken, requiereRol('administrador'
 
 // Listar todos los productos para admin
 router.get('/admin/listar', verificarToken, requiereRol('administrador'), listarProductosAdmin);
+
+// Actualizar producto completo (admin)
+router.put('/admin/:id', verificarToken, requiereRol('administrador'), actualizarProductoAdmin);
 
 module.exports = router;
