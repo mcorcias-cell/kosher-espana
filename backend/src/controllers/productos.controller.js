@@ -43,13 +43,15 @@ const buscarProductos = async (req, res) => {
             'comunidad', uv.comunidad, 'fecha', v.created_at,
             'es_revalidacion', v.es_revalidacion
           )
-        ) FILTER (WHERE v.id IS NOT NULL) AS validaciones
+        ) FILTER (WHERE v.id IS NOT NULL) AS validaciones,
+        array_agg(DISTINCT fp_loc.supermercado) FILTER (WHERE fp_loc.supermercado IS NOT NULL AND TRIM(fp_loc.supermercado) != '') AS supermercados
       FROM productos p
       LEFT JOIN users u ON p.subido_por = u.id
       LEFT JOIN producto_categorias pc ON pc.producto_id = p.id
       LEFT JOIN categorias c ON c.id = pc.categoria_id
       LEFT JOIN validaciones v ON v.producto_id = p.id
       LEFT JOIN users uv ON v.validador_id = uv.id
+      LEFT JOIN feedback_productos fp_loc ON fp_loc.producto_id = p.id
       WHERE ${where}
       GROUP BY p.id, u.nombre
       ORDER BY p.updated_at DESC

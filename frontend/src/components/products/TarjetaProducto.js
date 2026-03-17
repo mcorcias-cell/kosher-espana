@@ -14,6 +14,63 @@ const KOSHER_LABELS = {
   pescado: { texto: 'Pescado', color: '#2c7a7b', bg: '#e6fffa', emoji: '🐟' },
 };
 
+const SUPER_LOGOS = {
+  mercadona:      '/supermercados/mercadona.png',
+  carrefour:      '/supermercados/carrefour.png',
+  lidl:           '/supermercados/lidl.png',
+  alcampo:        '/supermercados/alcampo.png',
+  elcorteingles:  '/supermercados/elcorteingles.png',
+  dia:            '/supermercados/dia.png',
+};
+
+const getLogoSuper = (nombre) => {
+  if (!nombre) return null;
+  const clean = nombre.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+  return SUPER_LOGOS[clean] || null;
+};
+
+const LogosSupermercados = ({ supermercados }) => {
+  if (!supermercados || supermercados.length === 0) return null;
+
+  const conLogo = supermercados.filter(s => getLogoSuper(s));
+  if (conLogo.length === 0) return null;
+
+  const MAX = 3;
+  const visibles = conLogo.slice(0, MAX);
+  const extra = conLogo.length - MAX;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        {visibles.map((s, i) => (
+          <img
+            key={i}
+            src={getLogoSuper(s)}
+            alt={s}
+            title={s}
+            style={{
+              width: '22px',
+              height: '22px',
+              objectFit: 'contain',
+              borderRadius: '4px',
+              border: '1px solid #e2e8f0',
+              background: 'white',
+              marginLeft: i > 0 ? '-6px' : 0,
+              position: 'relative',
+              zIndex: visibles.length - i,
+            }}
+          />
+        ))}
+      </div>
+      {extra > 0 && (
+        <span style={{ fontSize: '0.68rem', color: '#a0aec0', marginLeft: '4px' }}>+{extra}</span>
+      )}
+    </div>
+  );
+};
+
 const TarjetaProducto = ({ producto, onClick }) => {
   const ultimaValidacion = producto.validaciones?.[0];
   const tipoInfo = ultimaValidacion ? TIPO_LABELS[ultimaValidacion.tipo] : null;
@@ -71,6 +128,8 @@ const TarjetaProducto = ({ producto, onClick }) => {
             Validado por {ultimaValidacion.validador} · {ultimaValidacion.comunidad}
           </p>
         )}
+
+        <LogosSupermercados supermercados={producto.supermercados} />
       </div>
     </div>
   );

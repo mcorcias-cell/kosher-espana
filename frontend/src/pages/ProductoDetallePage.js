@@ -29,6 +29,23 @@ const BERAJA_LABELS = {
   sheakol:      { texto: 'שהכל Sheakol',         emoji: '🌟', color: '#2b6cb0', bg: '#ebf8ff' },
 };
 
+const SUPER_LOGOS = {
+  mercadona:      '/supermercados/mercadona.png',
+  carrefour:      '/supermercados/carrefour.png',
+  lidl:           '/supermercados/lidl.png',
+  alcampo:        '/supermercados/alcampo.png',
+  elcorteingles:  '/supermercados/elcorteingles.png',
+  dia:            '/supermercados/dia.png',
+};
+
+const getLogoSuper = (nombre) => {
+  if (!nombre) return null;
+  const clean = nombre.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+  return SUPER_LOGOS[clean] || null;
+};
+
 const ScrollCarousel = ({ titulo, productos, verTodosUrl, navigate }) => {
   if (!productos || productos.length === 0) return null;
   return (
@@ -388,21 +405,72 @@ const ProductoDetallePage = () => {
         )}
 
         {/* Dónde encontrarlo */}
-        {producto.ubicaciones && producto.ubicaciones.length > 0 && (
-          <div style={seccion}>
-            <h2 style={subtitulo}>📍 Dónde encontrarlo</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem' }}>
-              {producto.ubicaciones.map((u, i) => (
-                <div key={i} style={{ padding: '10px 14px', background: '#f0fff4', borderRadius: '8px', borderLeft: '3px solid #38a169' }}>
-                  <div style={{ fontWeight: 600, color: '#276749', fontSize: '0.9rem' }}>{u.supermercado}</div>
-                  <div style={{ color: '#4a5568', fontSize: '0.82rem' }}>{u.localidad}</div>
-                  {u.notas && <div style={{ color: '#718096', fontSize: '0.78rem', marginTop: '4px' }}>{u.notas}</div>}
-                  {u.verificado && <div style={{ color: '#276749', fontSize: '0.73rem', marginTop: '4px' }}>✓ Verificado</div>}
-                </div>
-              ))}
+        {producto.ubicaciones && producto.ubicaciones.length > 0 && (() => {
+          const supersUnicos = [...new Set(producto.ubicaciones.map(u => u.supermercado).filter(Boolean))];
+          const logosUnicos = supersUnicos.filter(s => getLogoSuper(s));
+          const MAX = 3;
+          const logosVisibles = logosUnicos.slice(0, MAX);
+          const logosExtra = logosUnicos.length - MAX;
+
+          return (
+            <div style={seccion}>
+              {/* Header con logos superpuestos */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.75rem' }}>
+                <h2 style={{ ...subtitulo, marginBottom: 0 }}>📍 Dónde encontrarlo</h2>
+                {logosVisibles.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    {logosVisibles.map((s, i) => (
+                      <img
+                        key={i}
+                        src={getLogoSuper(s)}
+                        alt={s}
+                        title={s}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          objectFit: 'contain',
+                          borderRadius: '6px',
+                          border: '2px solid white',
+                          background: 'white',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                          marginLeft: i > 0 ? '-8px' : 0,
+                          position: 'relative',
+                          zIndex: logosVisibles.length - i,
+                        }}
+                      />
+                    ))}
+                    {logosExtra > 0 && (
+                      <span style={{ fontSize: '0.72rem', color: '#a0aec0', marginLeft: '6px' }}>+{logosExtra}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem' }}>
+                {producto.ubicaciones.map((u, i) => {
+                  const logo = getLogoSuper(u.supermercado);
+                  return (
+                    <div key={i} style={{ padding: '10px 14px', background: '#f0fff4', borderRadius: '8px', borderLeft: '3px solid #38a169', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                      {logo && (
+                        <img
+                          src={logo}
+                          alt={u.supermercado}
+                          style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '4px', background: 'white', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                        />
+                      )}
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#276749', fontSize: '0.9rem' }}>{u.supermercado}</div>
+                        <div style={{ color: '#4a5568', fontSize: '0.82rem' }}>{u.localidad}</div>
+                        {u.notas && <div style={{ color: '#718096', fontSize: '0.78rem', marginTop: '4px' }}>{u.notas}</div>}
+                        {u.verificado && <div style={{ color: '#276749', fontSize: '0.73rem', marginTop: '4px' }}>✓ Verificado</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Sugerencias misma marca */}
         {sugerenciasMarca.length > 0 && (
