@@ -12,15 +12,26 @@ const KOSHER_TIPOS = [
   { valor: 'pescado', label: '🐟 Pescado' },
 ];
 
+const FILTROS_INICIALES = { nombre: '', marca: '', fabricante: '', codigo_barras: '', supermercado: '' };
+
+const calcularVentanaPaginas = (actual, total) => {
+  const size = 8;
+  let inicio = Math.max(1, actual - Math.floor(size / 2));
+  let fin = inicio + size - 1;
+  if (fin > total) { fin = total; inicio = Math.max(1, fin - size + 1); }
+  return Array.from({ length: fin - inicio + 1 }, (_, i) => inicio + i);
+};
+
 const BusquedaPage = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const location = useLocation();
-  const [filtros, setFiltros] = useState({ nombre: '', marca: '', fabricante: '', codigo_barras: '' });
+  const [filtros, setFiltros] = useState(FILTROS_INICIALES);
   const [categoriaActiva, setCategoriaActiva] = useState(null);
   const [categoriaActivaNombre, setCategoriaActivaNombre] = useState('');
   const [tipoKosher, setTipoKosher] = useState(null);
   const [categorias, setCategorias] = useState([]);
+  const [busquedaCategoria, setBusquedaCategoria] = useState('');
   const [resultados, setResultados] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [pagina, setPagina] = useState(1);
@@ -30,27 +41,44 @@ const BusquedaPage = () => {
   useEffect(() => {
     categoriasService.listar().then(res => {
       setCategorias(res.data);
-      // Leer parámetros de URL (desde "Ver todos" en sugerencias)
       const params = new URLSearchParams(location.search);
       const marcaParam = params.get('marca');
       const catParam = params.get('categoria_id');
+
       if (marcaParam) {
-        setFiltros(f => ({ ...f, marca: marcaParam }));
-        buscar(1, null, null);
+        sessionStorage.removeItem('kosher_busqueda_estado');
+        const newFiltros = { ...FILTROS_INICIALES, marca: marcaParam };
+        setFiltros(newFiltros);
+        buscar(1, null, null, newFiltros);
       } else if (catParam) {
-        const catId = catParam;
-        setCategoriaActiva(catId);
-        buscar(1, catId, null);
+        sessionStorage.removeItem('kosher_busqueda_estado');
+        setCategoriaActiva(catParam);
+        const cat = res.data.find(c => String(c.id) === String(catParam));
+        if (cat) setCategoriaActivaNombre(`${cat.icono} ${cat.nombre}`);
+        buscar(1, catParam, null);
       } else {
+        const saved = sessionStorage.getItem('kosher_busqueda_estado');
+        if (saved) {
+          try {
+            const estado = JSON.parse(saved);
+            const filtrosGuardados = estado.filtros || FILTROS_INICIALES;
+            setFiltros(filtrosGuardados);
+            setCategoriaActiva(estado.categoriaActiva || null);
+            setCategoriaActivaNombre(estado.categoriaActivaNombre || '');
+            setTipoKosher(estado.tipoKosher || null);
+            buscar(estado.pagina || 1, estado.categoriaActiva || null, estado.tipoKosher || null, filtrosGuardados);
+            return;
+          } catch (e) {}
+        }
         buscar(1, null, null);
       }
     }).catch(() => { buscar(1, null, null); });
   }, []);
 
-  const buscar = useCallback(async (pag = 1, catId = categoriaActiva, tipo = tipoKosher) => {
+  const buscar = useCallback(async (pag = 1, catId = categoriaActiva, tipo = tipoKosher, filtrosOverride = null) => {
     setCargando(true);
     try {
-      const params = { ...filtros, page: pag, limit: 12 };
+      const params = { ...(filtrosOverride !== null ? filtrosOverride : filtros), page: pag, limit: 12 };
       if (catId) params.categoria_id = catId;
       if (tipo) params.tipo_kosher = tipo;
       Object.keys(params).forEach(k => !params[k] && delete params[k]);
@@ -85,20 +113,36 @@ const BusquedaPage = () => {
   const handleSubmit = (e) => { e.preventDefault(); buscar(1); };
 
   const limpiar = () => {
-    setFiltros({ nombre: '', marca: '', fabricante: '', codigo_barras: '' });
+    setFiltros(FILTROS_INICIALES);
     setCategoriaActiva(null); setCategoriaActivaNombre(''); setTipoKosher(null);
-    buscar(1, null, null);
+    setBusquedaCategoria('');
+    sessionStorage.removeItem('kosher_busqueda_estado');
+    buscar(1, null, null, FILTROS_INICIALES);
   };
 
-  const hayFiltrosActivos = categoriaActiva || tipoKosher;
+  const hayFiltrosActivos = categoriaActiva || tipoKosher || filtros.supermercado;
 
-  const Sidebar = () => (
+  const categoriasFiltradas = busquedaCategoria
+    ? categorias.filter(c => c.nombre.toLowerCase().includes(busquedaCategoria.toLowerCase()))
+    : categorias;
+
+  const renderSidebar = () => (
     <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-      <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '0.8rem', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Categorías</div>
-      <button style={catBtnStyle(!categoriaActiva)} onClick={() => handleCategoriaClick(null)}>
-        <span>📋</span><span style={{ flex: 1 }}>Todos</span>
-      </button>
-      {categorias.map(cat => (
+      <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '0.8rem', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Categorías</div>
+
+      <input
+        style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '0.5rem', outline: 'none', boxSizing: 'border-box' }}
+        placeholder="🔍 Buscar categoría..."
+        value={busquedaCategoria}
+        onChange={e => setBusquedaCategoria(e.target.value)}
+      />
+
+      {!busquedaCategoria && (
+        <button style={catBtnStyle(!categoriaActiva)} onClick={() => handleCategoriaClick(null)}>
+          <span>📋</span><span style={{ flex: 1 }}>Todos</span>
+        </button>
+      )}
+      {categoriasFiltradas.map(cat => (
         <button key={cat.id} style={catBtnStyle(categoriaActiva === cat.id)} onClick={() => handleCategoriaClick(cat)}>
           <span>{cat.icono}</span>
           <span style={{ flex: 1, fontSize: '0.79rem' }}>{cat.nombre}</span>
@@ -143,7 +187,7 @@ const BusquedaPage = () => {
       {/* Sidebar en móvil (desplegable) */}
       {isMobile && sidebarAbierto && (
         <div style={{ marginBottom: '1rem' }}>
-          <Sidebar />
+          {renderSidebar()}
         </div>
       )}
 
@@ -151,7 +195,7 @@ const BusquedaPage = () => {
         {/* Sidebar desktop */}
         {!isMobile && (
           <div style={{ position: 'sticky', top: '75px' }}>
-            <Sidebar />
+            {renderSidebar()}
           </div>
         )}
 
@@ -187,6 +231,12 @@ const BusquedaPage = () => {
                   )}
                   <input style={{ padding: '9px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }} placeholder="🏷️ Marca" value={filtros.marca} onChange={e => setFiltros(f => ({ ...f, marca: e.target.value }))} />
                   <input style={{ padding: '9px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }} placeholder="🏭 Fabricante" value={filtros.fabricante} onChange={e => setFiltros(f => ({ ...f, fabricante: e.target.value }))} />
+                  <input
+                    style={{ padding: '9px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', outline: 'none', gridColumn: isMobile ? undefined : 'span 2' }}
+                    placeholder="🏪 Supermercado (Donde encontrarlo)"
+                    value={filtros.supermercado}
+                    onChange={e => setFiltros(f => ({ ...f, supermercado: e.target.value }))}
+                  />
                 </div>
               )}
 
@@ -202,7 +252,7 @@ const BusquedaPage = () => {
           </div>
 
           {/* Filtros activos */}
-          {(categoriaActivaNombre || tipoKosher) && (
+          {(categoriaActivaNombre || tipoKosher || filtros.supermercado) && (
             <div style={{ marginBottom: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {categoriaActivaNombre && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: '#ebf8ff', color: '#2b6cb0', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 600 }}>
@@ -216,6 +266,16 @@ const BusquedaPage = () => {
                   <button onClick={() => handleTipoKosher(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2b6cb0', fontSize: '1rem', lineHeight: 1 }}>×</button>
                 </span>
               )}
+              {filtros.supermercado && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: '#ebf8ff', color: '#2b6cb0', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 600 }}>
+                  🏪 {filtros.supermercado}
+                  <button onClick={() => {
+                    const nf = { ...filtros, supermercado: '' };
+                    setFiltros(nf);
+                    buscar(1, categoriaActiva, tipoKosher, nf);
+                  }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2b6cb0', fontSize: '1rem', lineHeight: 1 }}>×</button>
+                </span>
+              )}
             </div>
           )}
 
@@ -226,6 +286,14 @@ const BusquedaPage = () => {
               <p style={{ color: '#718096', marginBottom: '0.75rem', fontSize: '0.875rem' }}>
                 {resultados.total} producto{resultados.total !== 1 ? 's' : ''} encontrado{resultados.total !== 1 ? 's' : ''}
               </p>
+
+              {/* Banner productos sin supermercado */}
+              {filtros.supermercado && resultados.total_sin_supermercado > 0 && (
+                <div style={{ background: '#fffbea', border: '1px solid #f6e05e', borderRadius: '8px', padding: '10px 14px', marginBottom: '0.75rem', fontSize: '0.875rem', color: '#744210' }}>
+                  ℹ️ {resultados.total_sin_supermercado} producto{resultados.total_sin_supermercado !== 1 ? 's' : ''} no {resultados.total_sin_supermercado !== 1 ? 'tienen' : 'tiene'} supermercado definido y no aparece{resultados.total_sin_supermercado !== 1 ? 'n' : ''} en estos resultados.
+                </div>
+              )}
+
               {resultados.productos.length > 0 ? (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(240px, 1fr))', gap: isMobile ? '0.75rem' : '1.25rem' }}>
@@ -233,15 +301,29 @@ const BusquedaPage = () => {
                       <TarjetaProducto key={p.id} producto={p} onClick={() => {
                         sessionStorage.setItem('kosher_nav_ids', JSON.stringify(resultados.productos.map(x => x.id)));
                         sessionStorage.setItem('kosher_nav_pagina', pagina);
+                        sessionStorage.setItem('kosher_busqueda_estado', JSON.stringify({
+                          filtros, categoriaActiva, categoriaActivaNombre, tipoKosher, pagina,
+                        }));
                         navigate(`/producto/${p.id}`);
                       }} />
                     ))}
                   </div>
+
                   {resultados.total_paginas > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-                      {Array.from({ length: resultados.total_paginas }, (_, i) => i + 1).map(n => (
-                        <button key={n} style={{ padding: '7px 14px', border: '1px solid #e2e8f0', borderRadius: '6px', background: n === pagina ? '#2b6cb0' : 'white', color: n === pagina ? 'white' : '#4a5568', cursor: 'pointer' }} onClick={() => buscar(n)}>{n}</button>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '0.25rem', marginTop: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button
+                        onClick={() => buscar(pagina - 1)}
+                        disabled={pagina === 1}
+                        style={paginaBtnStyle(false, pagina === 1)}
+                      >‹</button>
+                      {calcularVentanaPaginas(pagina, resultados.total_paginas).map(n => (
+                        <button key={n} style={paginaBtnStyle(n === pagina)} onClick={() => buscar(n)}>{n}</button>
                       ))}
+                      <button
+                        onClick={() => buscar(pagina + 1)}
+                        disabled={pagina === resultados.total_paginas}
+                        style={paginaBtnStyle(false, pagina === resultados.total_paginas)}
+                      >›</button>
                     </div>
                   )}
                 </>
@@ -265,6 +347,18 @@ const catBtnStyle = (activa) => ({
   fontSize: '0.83rem', fontWeight: activa ? 700 : 400,
   background: activa ? '#ebf8ff' : 'transparent',
   color: activa ? '#2b6cb0' : '#4a5568', marginBottom: '2px',
+});
+
+const paginaBtnStyle = (activa, deshabilitado = false) => ({
+  padding: '7px 12px',
+  border: '1px solid #e2e8f0',
+  borderRadius: '6px',
+  background: activa ? '#2b6cb0' : 'white',
+  color: activa ? 'white' : deshabilitado ? '#cbd5e0' : '#4a5568',
+  cursor: deshabilitado ? 'default' : 'pointer',
+  fontSize: '0.9rem',
+  fontWeight: activa ? 600 : 400,
+  minWidth: '36px',
 });
 
 export default BusquedaPage;

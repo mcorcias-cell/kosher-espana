@@ -5,7 +5,7 @@ const { cloudinary } = require('../config/cloudinary');
 
 // Buscar productos (solo validados y visibles)
 const buscarProductos = async (req, res) => {
-  const { nombre, marca, fabricante, codigo_barras, sabor_variante, categoria_id, page = 1, limit = 20 } = req.query;
+  const { nombre, marca, fabricante, codigo_barras, sabor_variante, categoria_id, supermercado, page = 1, limit = 20 } = req.query;
   const offset = (page - 1) * limit;
   const params = [];
   const condiciones = ["p.estado = 'validado'", "p.visible = true"];
@@ -18,7 +18,17 @@ const buscarProductos = async (req, res) => {
   if (categoria_id) { params.push(categoria_id); condiciones.push(`EXISTS (SELECT 1 FROM producto_categorias pc WHERE pc.producto_id = p.id AND pc.categoria_id = $${params.length})`); }
   if (req.query.tipo_kosher) { params.push(req.query.tipo_kosher); condiciones.push(`p.tipo_kosher = $${params.length}`); }
 
+  // Guardar params/condiciones base (sin supermercado) para la query de sin_supermercado
+  const baseParams = [...params];
+  const baseCondiciones = [...condiciones];
+
+  if (supermercado) {
+    params.push(`%${supermercado}%`);
+    condiciones.push(`EXISTS (SELECT 1 FROM feedback_productos fp WHERE fp.producto_id = p.id AND fp.supermercado ILIKE $${params.length})`);
+  }
+
   const where = condiciones.join(' AND ');
+  const baseWhere = baseCondiciones.join(' AND ');
 
   try {
     params.push(limit, offset);
@@ -47,16 +57,36 @@ const buscarProductos = async (req, res) => {
     `;
 
     const countQuery = `SELECT COUNT(DISTINCT p.id) FROM productos p LEFT JOIN producto_categorias pc ON pc.producto_id = p.id WHERE ${where}`;
-    const [result, countResult] = await Promise.all([
+
+    const promises = [
       pool.query(query, params),
       pool.query(countQuery, params.slice(0, -2)),
-    ]);
+    ];
+
+    if (supermercado) {
+      // Cuenta productos que cumplen los filtros base pero NO tienen ningún supermercado definido
+      const noSuperQuery = `
+        SELECT COUNT(DISTINCT p.id) FROM productos p
+        LEFT JOIN producto_categorias pc ON pc.producto_id = p.id
+        WHERE ${baseWhere}
+        AND NOT EXISTS (
+          SELECT 1 FROM feedback_productos fp2
+          WHERE fp2.producto_id = p.id
+          AND fp2.supermercado IS NOT NULL
+          AND TRIM(fp2.supermercado) != ''
+        )
+      `;
+      promises.push(pool.query(noSuperQuery, baseParams));
+    }
+
+    const [result, countResult, noSuperResult] = await Promise.all(promises);
 
     res.json({
       productos: result.rows,
       total: parseInt(countResult.rows[0].count),
       pagina: parseInt(page),
       total_paginas: Math.ceil(parseInt(countResult.rows[0].count) / limit),
+      ...(supermercado ? { total_sin_supermercado: parseInt(noSuperResult.rows[0].count) } : {}),
     });
   } catch (err) {
     console.error('Error buscando productos:', err);
